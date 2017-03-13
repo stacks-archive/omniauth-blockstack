@@ -15,18 +15,31 @@ module OmniAuth
       option :valid_within, nil
 
       def request_phase
-        # TODO generate blockstack auth request
-        # TODO redirect to user's auth endpoint
-        redirect 'blockstack://abcdef'
-      end
+        blockstack_js = File.open(File.join(File.dirname(__FILE__), "blockstack.js"), "rb").read
 
-      def decoded
-        @decoded ||= ::JWT.decode(request.params['jwt'], options.secret, ALGORITHM)[0]
-        (options.required_claims || []).each do |field|
-          raise ClaimInvalid.new("Missing required '#{field}' claim.") if !@decoded.key?(field.to_s)
-        end
+        auth_request_js = File.open(File.join(File.dirname(__FILE__), "auth-request.js"), "rb").read
 
-        @decoded
+        header_info = "<script>#{blockstack_js}</script>"
+        app_data_js = <<~JAVASCRIPT
+        var signingKey = null
+        var appManifest = {
+        name: "Hello, Blockstack OmniAuth",
+        start_url: "http://localhost:3888/auth/blockstack/callback",
+        description: "A simple demo of Blockstack Auth",
+        icons: [{
+          src: "https://raw.githubusercontent.com/blockstack/blockstack-portal/master/app/images/app-hello-blockstack.png",
+          sizes: "192x192",
+          type: "image/png",
+        }]
+        }
+        JAVASCRIPT
+
+        header_info << "<script>#{app_data_js}</script>"
+        header_info << "<script>#{auth_request_js}</script>"
+        form = OmniAuth::Form.new(:title => "Blockstack Auth Request Generator",
+        :header_info => header_info,
+        :url => callback_path)
+        form.to_response
       end
 
       def callback_phase
