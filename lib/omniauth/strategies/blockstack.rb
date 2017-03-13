@@ -8,11 +8,21 @@ module OmniAuth
 
       include OmniAuth::Strategy
 
-      ALGORITHM = 'ES256k'
+      args [:app_name]
+
+      ALGORITHM = 'ES256K'
+      LEEWAY = 30 #seconds
       option :uid_claim, 'iss'
       option :required_claims, %w(iss username)
       option :info_map, {"name" => "username"}
       option :valid_within, nil
+      option :app_name, nil
+      option :app_description, ""
+      option :app_icons, [{}]
+
+      def decoded_token
+        @decoded_token
+      end
 
       def request_phase
         blockstack_js = File.open(File.join(File.dirname(__FILE__), "blockstack.js"), "rb").read
@@ -23,14 +33,10 @@ module OmniAuth
         app_data_js = <<~JAVASCRIPT
         var signingKey = null
         var appManifest = {
-        name: "Hello, Blockstack OmniAuth",
-        start_url: "http://localhost:3888/auth/blockstack/callback",
-        description: "A simple demo of Blockstack Auth",
-        icons: [{
-          src: "https://raw.githubusercontent.com/blockstack/blockstack-portal/master/app/images/app-hello-blockstack.png",
-          sizes: "192x192",
-          type: "image/png",
-        }]
+        name: "#{options.app_name}",
+        start_url: "#{callback_url}",
+        description: "#{options.app_description}",
+        icons: #{options.app_icons.to_json}
         }
         JAVASCRIPT
 
@@ -49,20 +55,23 @@ module OmniAuth
         # public keys
         public_key = nil
         verify = false
-        decoded_token = JWT.decode token, public_key, verify, algorithm: ALGORITHM
+        decoded_tokens = JWT.decode token, public_key, verify, algorithm: ALGORITHM
 
-
-        payload = decoded_token['payload']
-        public_keys = payload['publicKeys']
-
+        public_keys = decoded_tokens[0]['publicKeys']
+        Rails.logger.debug decoded_tokens
         raise ClaimInvalid.new("Invalid publicKeys array: only 1 key is supported") unless public_keys.length == 1
 
-        public_key = public_keys[0]
+        compressed_hex_public_key = public_keys[0]
+        bignum = OpenSSL::BN.new(compressed_hex_public_key, 16)
+        group = OpenSSL::PKey::EC::Group.new 'secp256k1'
+        public_key = OpenSSL::PKey::EC::Point.new(group, bignum)
+        ecdsa_key = OpenSSL::PKey::EC.new 'secp256k1'
+        ecdsa_key.public_key = public_key
         verify = true
 
         # decode & verify
-        decoded_token = JWT.decode token, public_key, verify, algorithm: ALGORITHM
-
+        decoded_tokens = JWT.decode token, ecdsa_key, verify, algorithm: ALGORITHM, exp_leeway: LEEWAY
+        @decoded_token = decoded_tokens[0]
         (options.required_claims || []).each do |field|
           raise ClaimInvalid.new("Missing required '#{field}' claim.") if !decoded_token.key?(field.to_s)
         end
@@ -72,9 +81,23 @@ module OmniAuth
       rescue ClaimInvalid => error
         fail! :claim_invalid, error
       rescue JWT::VerificationError => error
-        fail! :signature_invalid
+        fail! :signature_invalid, error
+      rescue JWT::DecodeError => error
+        fail! :decode_error, error
       end
 
+      uid{ decoded_token[options.uid_claim] }
+
+      extra do
+        {:raw_info => decoded_token}
+      end
+
+      info do
+        options.info_map.inject({}) do |h,(k,v)|
+          h[k.to_s] = decoded_token[v.to_s]
+          h
+        end
+      end
     end
 
   end
