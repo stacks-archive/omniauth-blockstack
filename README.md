@@ -29,7 +29,7 @@ When you authenticate through `omniauth-blockstack` you can send users to `/auth
 them to their identity provider (typically the Blockstack Portal). From there, the provider must generate a signed authentication response
 and send it to the `/auth/blockstack/callback` URL as a "authResponse" parameter:
 
-    /auth/blockstack/callback?authResponse=ENCODEDGOESHERE
+    /auth/blockstack/callback?authResponse=AUTH_RESPONSE_GOES_HERE
 
 ## Contributing
 
