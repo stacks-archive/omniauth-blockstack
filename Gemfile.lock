@@ -8,7 +8,7 @@ GIT
 PATH
   remote: .
   specs:
-    omniauth-blockstack (0.0.1)
+    omniauth-blockstack (0.0.2)
       blockstack
       omniauth (~> 1.1)
 
@@ -18,7 +18,7 @@ GEM
     bitcoin (0.2.0)
       bitcoin-ruby
     bitcoin-ruby (0.0.10)
-    blockstack (0.5.3)
+    blockstack (0.5.4)
       bitcoin
       faraday
       jwt
