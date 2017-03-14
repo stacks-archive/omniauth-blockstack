@@ -18,7 +18,7 @@ GEM
     bitcoin (0.2.0)
       bitcoin-ruby
     bitcoin-ruby (0.0.10)
-    blockstack (0.5.2)
+    blockstack (0.5.3)
       bitcoin
       faraday
       jwt
