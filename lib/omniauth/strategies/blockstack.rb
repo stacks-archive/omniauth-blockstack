@@ -1,6 +1,7 @@
 require 'omniauth'
 require 'jwt'
 require 'bitcoin'
+require 'faraday'
 
 module OmniAuth
   module Strategies
@@ -9,17 +10,18 @@ module OmniAuth
 
       include OmniAuth::Strategy
 
-      args [:app_name]
+      args [:app_name, :blockstack_api]
 
       ALGORITHM = 'ES256K'
       LEEWAY = 30 #seconds
       option :uid_claim, 'iss'
-      option :required_claims, %w(iss username)
+      option :required_claims, %w(iss iat jti exp username profile publicKeys)
       option :info_map, {"name" => "username"}
       option :valid_within, nil
       option :app_name, nil
       option :app_description, ""
       option :app_icons, [{}]
+      option :blockstack_api, nil
 
       def decoded_token
         @decoded_token
@@ -47,6 +49,21 @@ module OmniAuth
         address_from_public_keys = Bitcoin::pubkey_to_address public_keys.first
 
         address_from_issuer == address_from_public_keys
+      end
+
+      def public_keys_match_username?(blockstack_api, decoded_token)
+        username = decoded_token["username"]
+        return true if username.nil?
+
+        response = Faraday.get "#{blockstack_api}/v1/names/#{username}"
+        json = JSON.parse response.body
+
+        raise "Issuer claimed username that doesn't exist" if response.status == 404
+        raise "Unable to verify issuer's claimed username" if response.status != 200
+
+        name_owning_address = json['address']
+        address_from_issuer = get_address_from_did decoded_token['iss']
+        name_owning_address == address_from_issuer
       end
 
       def request_phase
@@ -81,9 +98,16 @@ module OmniAuth
         public_key = nil
         verify = false
         decoded_tokens = JWT.decode token, public_key, verify, algorithm: ALGORITHM
+        @decoded_token = decoded_tokens[0]
 
-        public_keys = decoded_tokens[0]['publicKeys']
-        Rails.logger.debug decoded_tokens
+        (options.required_claims || []).each do |field|
+          raise ClaimInvalid.new("Missing required '#{field}' claim.") if !decoded_token.key?(field.to_s)
+        end
+        raise ClaimInvalid.new("Missing required 'iat' claim.") if options.valid_within && !decoded_token["iat"]
+        raise ClaimInvalid.new("'iat' timestamp claim is skewed too far from present.") if options.valid_within && (Time.now.to_i - decoded_token["iat"]).abs > options.valid_within
+
+        public_keys = decoded_token['publicKeys']
+
         raise ClaimInvalid.new("Invalid publicKeys array: only 1 key is supported") unless public_keys.length == 1
 
         compressed_hex_public_key = public_keys[0]
@@ -100,12 +124,9 @@ module OmniAuth
 
         raise "Public keys don't match issuer address" unless public_keys_match_issuer?(decoded_token)
 
-        (options.required_claims || []).each do |field|
-          raise ClaimInvalid.new("Missing required '#{field}' claim.") if !decoded_token.key?(field.to_s)
-        end
-        raise ClaimInvalid.new("Missing required 'iat' claim.") if options.valid_within && !decoded_token["iat"]
-        raise ClaimInvalid.new("'iat' timestamp claim is skewed too far from present.") if options.valid_within && (Time.now.to_i - decoded_token["iat"]).abs > options.valid_within
-        super
+        raise ClaimInvalid.new("Public keys don't match owner of claimed username") unless public_keys_match_username?(options.blockstack_api, decoded_token)
+
+            super
 
       rescue ClaimInvalid => error
         fail! :claim_invalid, error

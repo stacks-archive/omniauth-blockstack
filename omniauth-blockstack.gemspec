@@ -27,5 +27,6 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "jwt"
   spec.add_dependency "bitcoin-ruby"
+  spec.add_dependency "faraday"
   spec.add_dependency "omniauth", "~> 1.1"
 end
