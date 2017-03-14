@@ -1,5 +1,6 @@
 require 'omniauth'
 require 'jwt'
+require 'bitcoin'
 
 module OmniAuth
   module Strategies
@@ -22,6 +23,30 @@ module OmniAuth
 
       def decoded_token
         @decoded_token
+      end
+
+      def get_did_type(decentralized_id)
+        did_parts = decentralized_id.split(':')
+        raise 'Decentralized IDs must have 3 parts' if did_parts.length != 3
+        raise 'Decentralized IDs must start with "did"' if did_parts[0].downcase != 'did'
+        did_parts[1].downcase
+      end
+
+      def get_address_from_did(decentralized_id)
+        did_type = get_did_type(decentralized_id)
+        return nil if did_type != 'btc-addr'
+        decentralized_id.split(':')[2]
+      end
+
+      def public_keys_match_issuer?(decoded_token)
+        public_keys = decoded_token['publicKeys']
+        address_from_issuer = get_address_from_did(decoded_token['iss'])
+
+        raise 'Multiple public keys are not supported' unless public_keys.count == 1
+
+        address_from_public_keys = Bitcoin::pubkey_to_address public_keys.first
+
+        address_from_issuer == address_from_public_keys
       end
 
       def request_phase
@@ -69,21 +94,27 @@ module OmniAuth
         ecdsa_key.public_key = public_key
         verify = true
 
-        # decode & verify
+        # decode & verify signature
         decoded_tokens = JWT.decode token, ecdsa_key, verify, algorithm: ALGORITHM, exp_leeway: LEEWAY
         @decoded_token = decoded_tokens[0]
+
+        raise "Public keys don't match issuer address" unless public_keys_match_issuer?(decoded_token)
+
         (options.required_claims || []).each do |field|
           raise ClaimInvalid.new("Missing required '#{field}' claim.") if !decoded_token.key?(field.to_s)
         end
         raise ClaimInvalid.new("Missing required 'iat' claim.") if options.valid_within && !decoded_token["iat"]
         raise ClaimInvalid.new("'iat' timestamp claim is skewed too far from present.") if options.valid_within && (Time.now.to_i - decoded_token["iat"]).abs > options.valid_within
         super
+
       rescue ClaimInvalid => error
         fail! :claim_invalid, error
       rescue JWT::VerificationError => error
         fail! :signature_invalid, error
       rescue JWT::DecodeError => error
         fail! :decode_error, error
+      rescue Exception => error
+        fail! :error, error
       end
 
       uid{ decoded_token[options.uid_claim] }
