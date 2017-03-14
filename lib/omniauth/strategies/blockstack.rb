@@ -1,7 +1,5 @@
 require 'omniauth'
-require 'jwt'
-require 'bitcoin'
-require 'faraday'
+require 'blockstack'
 
 module OmniAuth
   module Strategies
@@ -12,58 +10,17 @@ module OmniAuth
 
       args [:app_name, :blockstack_api]
 
-      ALGORITHM = 'ES256K'
-      LEEWAY = 30 #seconds
       option :uid_claim, 'iss'
-      option :required_claims, %w(iss iat jti exp username profile publicKeys)
       option :info_map, {"name" => "username"}
+      option :leeway, nil
       option :valid_within, nil
+      option :blockstack_api, nil
       option :app_name, nil
       option :app_description, ""
       option :app_icons, [{}]
-      option :blockstack_api, nil
 
       def decoded_token
         @decoded_token
-      end
-
-      def get_did_type(decentralized_id)
-        did_parts = decentralized_id.split(':')
-        raise 'Decentralized IDs must have 3 parts' if did_parts.length != 3
-        raise 'Decentralized IDs must start with "did"' if did_parts[0].downcase != 'did'
-        did_parts[1].downcase
-      end
-
-      def get_address_from_did(decentralized_id)
-        did_type = get_did_type(decentralized_id)
-        return nil if did_type != 'btc-addr'
-        decentralized_id.split(':')[2]
-      end
-
-      def public_keys_match_issuer?(decoded_token)
-        public_keys = decoded_token['publicKeys']
-        address_from_issuer = get_address_from_did(decoded_token['iss'])
-
-        raise 'Multiple public keys are not supported' unless public_keys.count == 1
-
-        address_from_public_keys = Bitcoin::pubkey_to_address public_keys.first
-
-        address_from_issuer == address_from_public_keys
-      end
-
-      def public_keys_match_username?(blockstack_api, decoded_token)
-        username = decoded_token["username"]
-        return true if username.nil?
-
-        response = Faraday.get "#{blockstack_api}/v1/names/#{username}"
-        json = JSON.parse response.body
-
-        raise "Issuer claimed username that doesn't exist" if response.status == 404
-        raise "Unable to verify issuer's claimed username" if response.status != 200
-
-        name_owning_address = json['address']
-        address_from_issuer = get_address_from_did decoded_token['iss']
-        name_owning_address == address_from_issuer
       end
 
       def request_phase
@@ -91,51 +48,17 @@ module OmniAuth
       end
 
       def callback_phase
-        token = request.params['authResponse']
+        auth_response = request.params['authResponse']
 
-        # decode & verify token without checking signature so we can extract
-        # public keys
-        public_key = nil
-        verify = false
-        decoded_tokens = JWT.decode token, public_key, verify, algorithm: ALGORITHM
-        @decoded_token = decoded_tokens[0]
+        ::Blockstack.api = options.api
+        ::Blockstack.leeway = options.leeway
+        ::Blockstack.valid_within = options.valid_within
+        @decoded_token = ::Blockstack.verify_auth_response auth_response
+        puts "decoded_token: #{decoded_token}"
+        super
 
-        (options.required_claims || []).each do |field|
-          raise ClaimInvalid.new("Missing required '#{field}' claim.") if !decoded_token.key?(field.to_s)
-        end
-        raise ClaimInvalid.new("Missing required 'iat' claim.") if options.valid_within && !decoded_token["iat"]
-        raise ClaimInvalid.new("'iat' timestamp claim is skewed too far from present.") if options.valid_within && (Time.now.to_i - decoded_token["iat"]).abs > options.valid_within
-
-        public_keys = decoded_token['publicKeys']
-
-        raise ClaimInvalid.new("Invalid publicKeys array: only 1 key is supported") unless public_keys.length == 1
-
-        compressed_hex_public_key = public_keys[0]
-        bignum = OpenSSL::BN.new(compressed_hex_public_key, 16)
-        group = OpenSSL::PKey::EC::Group.new 'secp256k1'
-        public_key = OpenSSL::PKey::EC::Point.new(group, bignum)
-        ecdsa_key = OpenSSL::PKey::EC.new 'secp256k1'
-        ecdsa_key.public_key = public_key
-        verify = true
-
-        # decode & verify signature
-        decoded_tokens = JWT.decode token, ecdsa_key, verify, algorithm: ALGORITHM, exp_leeway: LEEWAY
-        @decoded_token = decoded_tokens[0]
-
-        raise "Public keys don't match issuer address" unless public_keys_match_issuer?(decoded_token)
-
-        raise ClaimInvalid.new("Public keys don't match owner of claimed username") unless public_keys_match_username?(options.blockstack_api, decoded_token)
-
-            super
-
-      rescue ClaimInvalid => error
-        fail! :claim_invalid, error
-      rescue JWT::VerificationError => error
-        fail! :signature_invalid, error
-      rescue JWT::DecodeError => error
-        fail! :decode_error, error
-      rescue Exception => error
-        fail! :error, error
+      rescue ::Blockstack::InvalidAuthResponse => error
+        fail! :invalid_auth_response, error
       end
 
       uid{ decoded_token[options.uid_claim] }
@@ -150,7 +73,7 @@ module OmniAuth
           h
         end
       end
-    end
 
+    end
   end
 end
