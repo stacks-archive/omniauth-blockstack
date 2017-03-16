@@ -11,7 +11,6 @@ module OmniAuth
       args [:app_name, :blockstack_api]
 
       option :uid_claim, 'iss'
-      option :info_map, {"name" => "username"}
       option :leeway, nil
       option :valid_within, nil
       option :blockstack_api, nil
@@ -54,7 +53,7 @@ module OmniAuth
         ::Blockstack.leeway = options.leeway
         ::Blockstack.valid_within = options.valid_within
         @decoded_token = ::Blockstack.verify_auth_response auth_response
-        puts "decoded_token: #{decoded_token}"
+
         super
 
       rescue ::Blockstack::InvalidAuthResponse => error
@@ -67,11 +66,46 @@ module OmniAuth
         {:raw_info => decoded_token}
       end
 
+      credentials do
+        token = nil # In future store token to access Blockstack Core node/storage here
+        {:token => token}
+      end
+
       info do
-        options.info_map.inject({}) do |h,(k,v)|
-          h[k.to_s] = decoded_token[v.to_s]
-          h
-        end
+        {
+          :nickname => decoded_token["username"],
+          :first_name => decoded_token["profile"].try(:[],"givenName"),
+          :last_name => decoded_token["profile"].try(:[],"familyName"),
+          :location => decoded_token["profile"].try(:[],"address").try(:[],"addressLocality"),
+          :description => decoded_token["profile"].try(:[],"description"),
+          :image => lambda {|images|
+            return nil if images.nil?
+            for image in images
+              if image && image.try(:[],"name") == "avatar"
+                avatar_url = image.try(:[],"contentUrl")
+                if avatar_url && !avatar_url.blank?
+                  return avatar_url
+                end
+              end
+            end
+            nil
+          }.call(decoded_token["profile"].try(:[],"image")),
+          :urls => lambda {|websites|
+            urls = {}
+            return urls if websites.nil?
+            count = 0
+            websites.each {|website|
+              if website.try(:[],"@type") == "WebSite"
+                if !website.try(:[],"url").nil?
+                  count++
+                  urls["site-#{count}"] = website["url"]
+                end
+              end
+              urls
+            }
+            return nil
+          }.call(decoded_token["profile"].try(:[],"website"))
+        }
       end
 
     end
