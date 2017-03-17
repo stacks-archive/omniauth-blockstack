@@ -49,7 +49,7 @@ module OmniAuth
       def callback_phase
         auth_response = request.params['authResponse']
 
-        ::Blockstack.api = options.api
+        ::Blockstack.api = options.blockstack_api
         ::Blockstack.leeway = options.leeway
         ::Blockstack.valid_within = options.valid_within
         @decoded_token = ::Blockstack.verify_auth_response auth_response
