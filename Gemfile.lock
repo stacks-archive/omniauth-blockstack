@@ -2,14 +2,14 @@ PATH
   remote: .
   specs:
     omniauth-blockstack (0.9.3)
-      blockstack (= 0.5.7)
+      blockstack (= 0.5.8)
       omniauth (~> 1.1)
 
 GEM
   remote: https://rubygems.org/
   specs:
     bitcoin-ruby (0.0.10)
-    blockstack (0.5.7)
+    blockstack (0.5.8)
       bitcoin-ruby
       faraday
       jwt-blockstack (= 2.0.0.beta2)

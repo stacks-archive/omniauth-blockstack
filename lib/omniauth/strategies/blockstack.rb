@@ -1,5 +1,6 @@
 require 'omniauth'
 require 'blockstack'
+require 'uri'
 
 module OmniAuth
   module Strategies
@@ -15,6 +16,7 @@ module OmniAuth
       option :valid_within, nil
       option :blockstack_api, nil
       option :app_name, nil
+      option :app_short_name, nil
       option :app_description, ""
       option :app_icons, [{}]
 
@@ -23,19 +25,33 @@ module OmniAuth
       end
 
       def request_phase
+        app_manifest = {
+          :name => options.app_name,
+          :short_name => (options.app_short_name ? options.app_short_name : options.app_name),
+          :start_url => callback_url,
+          :display => "standalone",
+          :background_color => "#fff",
+          :description => options.app_description,
+          :icons => options.app_icons.to_json
+        }
+
+        if request.params["manifest"]
+          return Rack::Response.new(app_manifest.to_json,
+                                    200,
+                                    'content-type' => 'text/json',
+                                    'Access-Control-Allow-Origin' => '*').finish
+        end
+
         blockstack_js = File.open(File.join(File.dirname(__FILE__), "blockstack.js"), "rb").read
 
         auth_request_js = File.open(File.join(File.dirname(__FILE__), "auth-request.js"), "rb").read
 
         header_info = "<script>#{blockstack_js}</script>"
         app_data_js = <<~JAVASCRIPT
-        var signingKey = null
-        var appManifest = {
-        name: "#{options.app_name}",
-        start_url: "#{callback_url}",
-        description: "#{options.app_description}",
-        icons: #{options.app_icons.to_json}
-        }
+        var manifestURI = "#{callback_url.chomp("/callback") + "?manifest=true"}"
+        var domainName = "#{URI::parse(callback_url).host}"
+        var redirectURI = "#{callback_url}"
+
         JAVASCRIPT
 
         header_info << "<script>#{app_data_js}</script>"
