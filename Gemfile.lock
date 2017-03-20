@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    omniauth-blockstack (0.9.3)
+    omniauth-blockstack (0.10.0)
       blockstack (= 0.5.8)
       omniauth (~> 1.1)
 
