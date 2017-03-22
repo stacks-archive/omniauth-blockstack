@@ -32,7 +32,7 @@ module OmniAuth
           :display => "standalone",
           :background_color => "#fff",
           :description => options.app_description,
-          :icons => options.app_icons.to_json
+          :icons => options.app_icons
         }
 
         if request.params["manifest"]
