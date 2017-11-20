@@ -110,16 +110,15 @@ module OmniAuth
             urls = {}
             return urls if websites.nil?
             count = 0
-            websites.each {|website|
+            websites.each do |website|
               if website.try(:[],"@type") == "WebSite"
                 if !website.try(:[],"url").nil?
-                  count++
+                  count = count + 1
                   urls["site-#{count}"] = website["url"]
                 end
               end
-              urls
-            }
-            return nil
+            end
+            return urls
           }.call(decoded_token["profile"].try(:[],"website"))
         }
       end
