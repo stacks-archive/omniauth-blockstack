@@ -49,7 +49,6 @@ module OmniAuth
         header_info = "<script>#{blockstack_js}</script>"
         app_data_js = <<~JAVASCRIPT
         var manifestURI = "#{callback_url.chomp("/callback") + "?manifest=true"}"
-        var domainName = "#{URI::parse(callback_url).host}"
         var redirectURI = "#{callback_url}"
 
         JAVASCRIPT
