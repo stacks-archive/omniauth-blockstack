@@ -47,17 +47,19 @@ module OmniAuth
         auth_request_js = File.open(File.join(File.dirname(__FILE__), "auth-request.js"), "rb").read
 
         header_info = "<script>#{blockstack_js}</script>"
-        app_data_js = <<~JAVASCRIPT
+        app_data_js = <<~EOS
         var manifestURI = "#{callback_url.chomp("/callback") + "?manifest=true"}"
         var redirectURI = "#{callback_url}"
-
-        JAVASCRIPT
+        var scopes = #{options.scope ? '['+options.scope.map {|s| "'#{s}'"}.join(',') + ']' : null}
+        EOS
 
         header_info << "<script>#{app_data_js}</script>"
         header_info << "<script>#{auth_request_js}</script>"
-        form = OmniAuth::Form.new(:title => "Blockstack Auth Request Generator",
-        :header_info => header_info,
-        :url => callback_path)
+        form = OmniAuth::Form.new(
+          :title => "Blockstack Auth Request Generator",
+          :header_info => header_info,
+          :url => callback_path
+        )
         form.to_response
       end
 
