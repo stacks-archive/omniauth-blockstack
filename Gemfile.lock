@@ -1,21 +1,21 @@
 PATH
   remote: .
   specs:
-    omniauth-blockstack (0.10.6)
-      blockstack (= 0.5.9)
+    omniauth-blockstack (11.0.0)
+      blockstack (~> 8.0)
       omniauth (~> 1.1)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    bitcoin-ruby (0.0.10)
-    blockstack (0.5.9)
+    bitcoin-ruby (0.0.18)
+    blockstack (8.0.0)
       bitcoin-ruby
       faraday
       jwtb (= 2.0.0.beta2.bsk1)
     coderay (1.1.1)
     diff-lcs (1.3)
-    faraday (0.12.2)
+    faraday (0.15.0)
       multipart-post (>= 1.2, < 3)
     ffi (1.9.18)
     formatador (0.2.5)
@@ -33,7 +33,7 @@ GEM
       guard (~> 2.1)
       guard-compat (~> 1.1)
       rspec (>= 2.99.0, < 4.0)
-    hashie (3.5.5)
+    hashie (3.5.7)
     jwtb (2.0.0.beta2.bsk1)
     listen (3.1.5)
       rb-fsevent (~> 0.9, >= 0.9.4)
@@ -46,7 +46,7 @@ GEM
     notiffany (0.1.1)
       nenv (~> 0.1)
       shellany (~> 0.0)
-    omniauth (1.6.1)
+    omniauth (1.8.1)
       hashie (>= 3.4.6, < 3.6.0)
       rack (>= 1.6.2, < 3)
     pry (0.10.4)

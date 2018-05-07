@@ -25,6 +25,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "guard-rspec"
   spec.add_development_dependency "rack-test"
 
-  spec.add_dependency "blockstack", "0.5.9"
+  spec.add_dependency "blockstack", "~> 8.0"
   spec.add_dependency "omniauth", "~> 1.1"
 end
