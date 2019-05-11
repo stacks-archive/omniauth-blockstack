@@ -23,6 +23,12 @@ You use OmniAuth::Blockstack like you do any other OmniAuth strategy:
 use OmniAuth::Blockstack
 ```
 
+If you want to pass [scopes](https://github.com/blockstack/blockstack.js/tree/master/src/auth#scopes) to the authentication flow:
+
+```ruby
+use OmniAuth::Blockstack, scope: ['publish_data', 'store_write', 'email']
+```
+
 ### Authentication Process
 
 When you authenticate through `omniauth-blockstack` you can send users to `/auth/blockstack` and it will redirect
