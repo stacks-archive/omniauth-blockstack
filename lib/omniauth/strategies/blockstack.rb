@@ -57,7 +57,7 @@ module OmniAuth
         header_info << "<script>#{auth_request_js}</script>"
 
         title = "Redirecting to Blockstack"
-        html << <<-HTML
+        html = %{
           <!DOCTYPE html>
           <html>
           <head>
@@ -67,7 +67,7 @@ module OmniAuth
           </head>
           <body>Redirecting to blockstack</body>
           </html>
-        HTML
+        }
         Rack::Response.new(html, 200, 'content-type' => 'text/html').finish
       end
 
