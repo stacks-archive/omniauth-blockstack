@@ -1,5 +1,5 @@
 module Omniauth
   module Blockstack
-    VERSION = "11.0.0"
+    VERSION = "19.1.0"
   end
 end
