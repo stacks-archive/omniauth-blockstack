@@ -55,10 +55,20 @@ module OmniAuth
 
         header_info << "<script>#{app_data_js}</script>"
         header_info << "<script>#{auth_request_js}</script>"
-        form = OmniAuth::Form.new(:title => "Blockstack Auth Request Generator",
-        :header_info => header_info,
-        :url => callback_path)
-        form.to_response
+
+        title = "Redirecting to Blockstack"
+        html << <<-HTML
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+            <title>#{title}</title>
+            #{header_info}
+          </head>
+          <body>Redirecting to blockstack</body>
+          </html>
+        HTML
+        Rack::Response.new(html, 200, 'content-type' => 'text/html').finish
       end
 
       def callback_phase
